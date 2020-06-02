@@ -50,8 +50,16 @@ class DatabaseFeatures(PostgresDatabaseFeatures):
     # test) isn't implemented: https://github.com/cockroachdb/cockroach/issues/41649
     can_introspect_materialized_views = property(operator.attrgetter('is_cockroachdb_20_2'))
 
-    introspected_big_auto_field_type = 'BigIntegerField'
-    introspected_small_auto_field_type = 'BigIntegerField'
+    @cached_property
+    def introspected_field_types(self):
+        return {
+            **super().introspected_field_types,
+            'AutoField': 'BigIntegerField',
+            'BigAutoField': 'BigIntegerField',
+            'IntegerField': 'BigIntegerField',
+            'PositiveIntegerField': 'BigIntegerField',
+            'SmallAutoField': 'BigIntegerField',
+        }
 
     # adding a REFERENCES constraint while also adding a column via ALTER not
     # supported: https://github.com/cockroachdb/cockroach/issues/32917
@@ -64,6 +72,17 @@ class DatabaseFeatures(PostgresDatabaseFeatures):
     # CockroachDB stopped creating indexes on foreign keys in 20.2.
     indexes_foreign_keys = property(operator.attrgetter('is_not_cockroachdb_20_2'))
 
+    test_collations = {
+        # PostgresDatabaseFeatures uses 'sv-x-icu' for 'non_default' but
+        # CockroachDB doesn't introspect that properly:
+        # https://github.com/cockroachdb/cockroach/issues/54817
+        'non_default': 'sv',
+        'swedish_ci': 'sv-x-icu',
+    }
+
+    # Not supported: https://github.com/cockroachdb/cockroach/issues/9682
+    supports_expression_indexes = False
+
     @cached_property
     def is_cockroachdb_20_2(self):
         return self.connection.cockroachdb_version >= (20, 2)
@@ -74,7 +93,8 @@ class DatabaseFeatures(PostgresDatabaseFeatures):
 
     @cached_property
     def django_test_expected_failures(self):
-        expected_failures = {
+        expected_failures = super().django_test_expected_failures
+        expected_failures.update({
             # sum(): unsupported binary operator: <float> + <int>:
             # https://github.com/cockroachdb/django-cockroachdb/issues/73
             'aggregation.tests.AggregateTestCase.test_add_implementation',
@@ -86,26 +106,7 @@ class DatabaseFeatures(PostgresDatabaseFeatures):
             # https://github.com/cockroachdb/django-cockroachdb/issues/22
             'db_functions.math.test_power.PowerTests.test_integer',
             # Tests that assume a serial pk: https://github.com/cockroachdb/django-cockroachdb/issues/18
-            'admin_views.tests.AdminViewPermissionsTest.test_history_view',
-            'aggregation_regress.tests.AggregationTests.test_more_more',
-            'aggregation_regress.tests.AggregationTests.test_more_more_more',
-            'aggregation_regress.tests.AggregationTests.test_ticket_11293',
-            'defer_regress.tests.DeferRegressionTest.test_ticket_23270',
-            'distinct_on_fields.tests.DistinctOnTests.test_basic_distinct_on',
-            'generic_relations_regress.tests.GenericRelationTests.test_annotate',
-            'migrations.test_operations.OperationTests.test_alter_order_with_respect_to',
-            'model_formsets_regress.tests.FormfieldShouldDeleteFormTests.test_custom_delete',
             'multiple_database.tests.RouterTestCase.test_generic_key_cross_database_protection',
-            'ordering.tests.OrderingTests.test_order_by_fk_attname',
-            'ordering.tests.OrderingTests.test_order_by_pk',
-            'queries.test_bulk_update.BulkUpdateNoteTests.test_multiple_fields',
-            'queries.test_bulk_update.BulkUpdateTests.test_inherited_fields',
-            'queries.tests.Queries1Tests.test_ticket9411',
-            'queries.tests.RelatedLookupTypeTests.test_values_queryset_lookup',
-            'syndication_tests.tests.SyndicationFeedTest.test_rss2_feed',
-            'syndication_tests.tests.SyndicationFeedTest.test_latest_post_date',
-            'syndication_tests.tests.SyndicationFeedTest.test_rss091_feed',
-            'syndication_tests.tests.SyndicationFeedTest.test_template_feed',
             # unknown function: sha224() and sha384():
             # https://github.com/cockroachdb/django-cockroachdb/issues/81
             'db_functions.text.test_sha224.SHA224Tests.test_basic',
@@ -124,6 +125,7 @@ class DatabaseFeatures(PostgresDatabaseFeatures):
             'fixtures.tests.ForwardReferenceTests.test_forward_reference_fk',
             'fixtures.tests.ForwardReferenceTests.test_forward_reference_m2m',
             'serializers.test_data.SerializerDataTests.test_json_serializer',
+            'serializers.test_data.SerializerDataTests.test_jsonl_serializer',
             'serializers.test_data.SerializerDataTests.test_python_serializer',
             'serializers.test_data.SerializerDataTests.test_xml_serializer',
             'serializers.test_data.SerializerDataTests.test_yaml_serializer',
@@ -137,6 +139,7 @@ class DatabaseFeatures(PostgresDatabaseFeatures):
             # https://github.com/cockroachdb/cockroach/issues/19444
             'auth_tests.test_views.UUIDUserTests.test_admin_password_change',
             'backends.tests.FkConstraintsTests.test_check_constraints',
+            'backends.tests.FkConstraintsTests.test_check_constraints_sql_keywords',
             'backends.tests.FkConstraintsTests.test_disable_constraint_checks_context_manager',
             'backends.tests.FkConstraintsTests.test_disable_constraint_checks_manually',
             # Passing a naive datetime to cursor.execute() probably can't work
@@ -174,6 +177,11 @@ class DatabaseFeatures(PostgresDatabaseFeatures):
             # CockroachDB doesn't support changing the primary key of table.
             'schema.tests.SchemaTests.test_alter_not_unique_field_to_primary_key',
             'schema.tests.SchemaTests.test_primary_key',
+            # type conversion from VARCHAR(255) to VARCHAR(255) COLLATE sv
+            # requires overwriting existing values which is not yet implemented:
+            # https://github.com/cockroachdb/cockroach/issues/9851
+            'schema.tests.SchemaTests.test_alter_field_db_collation',
+            'schema.tests.SchemaTests.test_alter_field_type_and_db_collation',
             # SmallAutoField doesn't work:
             # https://github.com/cockroachdb/cockroach-django/issues/84
             'bulk_create.tests.BulkCreateTests.test_bulk_insert_nullable_fields',
@@ -191,11 +199,16 @@ class DatabaseFeatures(PostgresDatabaseFeatures):
             'model_fields.test_jsonfield.TestQuerying.test_deep_lookup_transform',
             # ordering by JSON isn't supported:
             # https://github.com/cockroachdb/cockroach/issues/35706
+            'expressions_window.tests.WindowFunctionTests.test_key_transform',
             'model_fields.test_jsonfield.TestQuerying.test_deep_distinct',
+            'model_fields.test_jsonfield.TestQuerying.test_join_key_transform_annotation_expression',
             'model_fields.test_jsonfield.TestQuerying.test_order_grouping_custom_decoder',
             'model_fields.test_jsonfield.TestQuerying.test_ordering_by_transform',
             'model_fields.test_jsonfield.TestQuerying.test_ordering_grouping_by_key_transform',
-        }
+            # db_collation appears even if none is specified:
+            # https://github.com/cockroachdb/cockroach/issues/54989
+            'inspectdb.tests.InspectDBTestCase.test_field_types',
+        })
         if not self.connection.features.is_cockroachdb_20_2:
             expected_failures.update({
                 # stddev/variance functions not supported:
@@ -211,38 +224,47 @@ class DatabaseFeatures(PostgresDatabaseFeatures):
                 'introspection.tests.IntrospectionTests.test_table_names_with_views',
                 # excluding null json keys incorrectly returns values where the
                 # key doesn't exist: https://github.com/cockroachdb/cockroach/issues/49143
+                'model_fields.test_jsonfield.TestQuerying.test_lookup_exclude',
+                'model_fields.test_jsonfield.TestQuerying.test_lookup_exclude_nonexistent_key',
                 'model_fields.test_jsonfield.TestQuerying.test_none_key_exclude',
+                # CharField.max_length reported as -1 on columns with a collation.
+                # https://github.com/cockroachdb/cockroach/issues/54990
+                'inspectdb.tests.InspectDBTestCase.test_char_field_db_collation',
             })
         return expected_failures
 
-    django_test_skips = {
-        # https://github.com/cockroachdb/django-cockroachdb/issues/20
-        'Unsupported query: UPDATE float column with integer column.': {
-            'expressions.tests.ExpressionsNumericTests',
-        },
-        # https://github.com/cockroachdb/django-cockroachdb/issues/153#issuecomment-664697963
-        'CockroachDB has more restrictive blocking than other databases.': {
-            'select_for_update.tests.SelectForUpdateTests.test_block',
-        },
-        # https://www.cockroachlabs.com/docs/stable/transaction-retry-error-reference.html#retry_write_too_old
-        'Fails with TransactionRetryWithProtoRefreshError: ... RETRY_WRITE_TOO_OLD ...': {
-            'delete_regress.tests.DeleteLockingTest.test_concurrent_delete',
-        },
-        'Skip to prevents some error output in the logs.': {
-            # Since QuerySet.select_for_update() was enabled, this test is
-            # already skipped by the 'Database took too long to lock the row'
-            # logic in the test. Skipping it entirely prevents some error
-            # output in the logs:
-            # Exception in thread Thread-1:
-            # ...
-            # psycopg2.errors.SerializationFailure: restart transaction:
-            # TransactionRetryWithProtoRefreshError: WriteTooOldError: write
-            # at timestamp 1598314405.858850941,0 too old; wrote at
-            # 1598314405.883337663,1
-            'get_or_create.tests.UpdateOrCreateTransactionTests.test_creation_in_transaction',
-            # Sometimes fails as above or with
-            # AssertionError: datetime.timedelta(microseconds=28529) not
-            # greater than datetime.timedelta(microseconds=500000)
-            'get_or_create.tests.UpdateOrCreateTransactionTests.test_updates_in_transaction',
-        },
-    }
+    @cached_property
+    def django_test_skips(self):
+        skips = super().django_test_skips
+        skips.update({
+            # https://github.com/cockroachdb/django-cockroachdb/issues/20
+            'Unsupported query: UPDATE float column with integer column.': {
+                'expressions.tests.ExpressionsNumericTests',
+            },
+            # https://github.com/cockroachdb/django-cockroachdb/issues/153#issuecomment-664697963
+            'CockroachDB has more restrictive blocking than other databases.': {
+                'select_for_update.tests.SelectForUpdateTests.test_block',
+            },
+            # https://www.cockroachlabs.com/docs/stable/transaction-retry-error-reference.html#retry_write_too_old
+            'Fails with TransactionRetryWithProtoRefreshError: ... RETRY_WRITE_TOO_OLD ...': {
+                'delete_regress.tests.DeleteLockingTest.test_concurrent_delete',
+            },
+            'Skip to prevents some error output in the logs.': {
+                # Since QuerySet.select_for_update() was enabled, this test is
+                # already skipped by the 'Database took too long to lock the row'
+                # logic in the test. Skipping it entirely prevents some error
+                # output in the logs:
+                # Exception in thread Thread-1:
+                # ...
+                # psycopg2.errors.SerializationFailure: restart transaction:
+                # TransactionRetryWithProtoRefreshError: WriteTooOldError: write
+                # at timestamp 1598314405.858850941,0 too old; wrote at
+                # 1598314405.883337663,1
+                'get_or_create.tests.UpdateOrCreateTransactionTests.test_creation_in_transaction',
+                # Sometimes fails as above or with
+                # AssertionError: datetime.timedelta(microseconds=28529) not
+                # greater than datetime.timedelta(microseconds=500000)
+                'get_or_create.tests.UpdateOrCreateTransactionTests.test_updates_in_transaction',
+            },
+        })
+        return skips

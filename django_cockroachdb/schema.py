@@ -35,6 +35,16 @@ class DatabaseSchemaEditor(PostgresDatabaseSchemaEditor):
         else:
             return None
 
+    def add_index(self, model, index, concurrently=False):
+        if index.contains_expressions and not self.connection.features.supports_expression_indexes:
+            return None
+        super().add_index(model, index, concurrently)
+
+    def remove_index(self, model, index, concurrently=False):
+        if index.contains_expressions and not self.connection.features.supports_expression_indexes:
+            return None
+        super().remove_index(model, index, concurrently)
+
     def _index_columns(self, table, columns, col_suffixes, opclasses):
         # cockroachdb doesn't support PostgreSQL opclasses.
         return BaseDatabaseSchemaEditor._index_columns(self, table, columns, col_suffixes, opclasses)
