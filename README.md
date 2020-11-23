@@ -95,7 +95,7 @@ other words, if you try this Django setting:
 It will fail with `OSError: libgeos.so.3.8.1: cannot open shared object file:
 No such file or directory`.
 
-## Known issues and limitations (as of CockroachDB 20.2.6)
+## Known issues and limitations (as of CockroachDB 21.1)
 
 - CockroachDB [can't disable constraint checking](https://github.com/cockroachdb/cockroach/issues/19444),
   which means certain things in Django like forward references in fixtures
@@ -105,9 +105,6 @@ No such file or directory`.
 
    - [changing column type](https://github.com/cockroachdb/cockroach/issues/9851)
    - dropping or changing a table's primary key
-
-- Known Bugs:
-   - [Timezones after 2038 use incorrect DST settings](https://github.com/cockroachdb/django-cockroachdb/issues/124).
 
 - Unsupported queries:
    - [Mixed type addition in SELECT](https://github.com/cockroachdb/django-cockroachdb/issues/19):
@@ -123,11 +120,10 @@ No such file or directory`.
    - [greatest() doesn't support arguments of different types](https://github.com/cockroachdb/django-cockroachdb/issues/74):
      `greatest(): expected <arg> to be of type <type>, found type <other type>`
    - [`SmallAutoField` generates values that are too large for any corresponding foreign keys](https://github.com/cockroachdb/django-cockroachdb/issues/84).
-   - [The `SHA224` and `SHA384` database functions aren't supported](https://github.com/cockroachdb/django-cockroachdb/issues/81).
 
 - GIS:
    - Some database functions aren't supported: `AsGML`, `AsKML`, `AsSVG`,
-     `BoundingCircle`,  `GeometryDistance`, `LineLocatePoint`, and `MemSize`.
+     and `GeometryDistance`.
    - The `Length` database function isn't supported on geodetic fields:
      [st_lengthspheroid(): unimplemented](https://github.com/cockroachdb/cockroach/issues/48968).
    - `Union` may crash with
@@ -143,3 +139,13 @@ No such file or directory`.
      - [overlaps_left (&<), overlaps_right (&>), overlaps_above (&<|),
        overlaps_below (&>|)](https://github.com/cockroachdb/cockroach/issues/57098)
      - [strictly_above (|>>), strictly_below (<<|)](https://github.com/cockroachdb/cockroach/issues/57095)
+
+## Known issues and limitations in CockroachDB 20.2.x and earlier
+
+- [Timezones after 2038 use incorrect DST settings](https://github.com/cockr
+oachdb/django-cockroachdb/issues/124).
+
+- The `SHA224` and `SHA384` database functions aren't supported.
+
+- The  `BoundingCircle`, `LineLocatePoint`, and `MemSize` database functions
+  aren't supported.

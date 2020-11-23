@@ -62,6 +62,9 @@ class DatabaseFeatures(PostgresDatabaseFeatures):
     # CockroachDB doesn't create indexes on foreign keys.
     indexes_foreign_keys = False
 
+    # Not supported: https://github.com/cockroachdb/cockroach/issues/59567
+    supports_non_deterministic_collations = False
+
     test_collations = {
         # PostgresDatabaseFeatures uses 'sv-x-icu' for 'non_default' but
         # CockroachDB doesn't introspect that properly:
@@ -72,6 +75,10 @@ class DatabaseFeatures(PostgresDatabaseFeatures):
 
     # Not supported: https://github.com/cockroachdb/cockroach/issues/9682
     supports_expression_indexes = False
+
+    @cached_property
+    def is_cockroachdb_21_1(self):
+        return self.connection.cockroachdb_version >= (21, 1)
 
     @cached_property
     def django_test_expected_failures(self):
@@ -89,12 +96,6 @@ class DatabaseFeatures(PostgresDatabaseFeatures):
             'db_functions.math.test_power.PowerTests.test_integer',
             # Tests that assume a serial pk: https://github.com/cockroachdb/django-cockroachdb/issues/18
             'multiple_database.tests.RouterTestCase.test_generic_key_cross_database_protection',
-            # unknown function: sha224() and sha384():
-            # https://github.com/cockroachdb/django-cockroachdb/issues/81
-            'db_functions.text.test_sha224.SHA224Tests.test_basic',
-            'db_functions.text.test_sha224.SHA224Tests.test_transform',
-            'db_functions.text.test_sha384.SHA384Tests.test_basic',
-            'db_functions.text.test_sha384.SHA384Tests.test_transform',
             # Unsupported query: mixed type addition in SELECT:
             # https://github.com/cockroachdb/django-cockroachdb/issues/19
             'annotations.tests.NonAggregateAnnotationTestCase.test_mixed_type_annotation_numbers',
@@ -145,6 +146,8 @@ class DatabaseFeatures(PostgresDatabaseFeatures):
             'migrations.test_operations.OperationTests.test_rename_field_reloads_state_on_fk_target_changes',
             'schema.tests.SchemaTests.test_alter_auto_field_to_char_field',
             'schema.tests.SchemaTests.test_alter_autofield_pk_to_smallautofield_pk_sequence_owner',
+            'schema.tests.SchemaTests.test_alter_field_db_collation',
+            'schema.tests.SchemaTests.test_alter_field_type_and_db_collation',
             'schema.tests.SchemaTests.test_alter_text_field_to_date_field',
             'schema.tests.SchemaTests.test_alter_text_field_to_datetime_field',
             'schema.tests.SchemaTests.test_alter_text_field_to_time_field',
@@ -159,11 +162,6 @@ class DatabaseFeatures(PostgresDatabaseFeatures):
             # CockroachDB doesn't support changing the primary key of table.
             'schema.tests.SchemaTests.test_alter_not_unique_field_to_primary_key',
             'schema.tests.SchemaTests.test_primary_key',
-            # type conversion from VARCHAR(255) to VARCHAR(255) COLLATE sv
-            # requires overwriting existing values which is not yet implemented:
-            # https://github.com/cockroachdb/cockroach/issues/9851
-            'schema.tests.SchemaTests.test_alter_field_db_collation',
-            'schema.tests.SchemaTests.test_alter_field_type_and_db_collation',
             # SmallAutoField doesn't work:
             # https://github.com/cockroachdb/cockroach-django/issues/84
             'bulk_create.tests.BulkCreateTests.test_bulk_insert_nullable_fields',
@@ -173,9 +171,6 @@ class DatabaseFeatures(PostgresDatabaseFeatures):
             # This backend raises "ValueError: CockroachDB's EXPLAIN doesn't
             # support any formats." instead of an "unknown format" error.
             'queries.test_explain.ExplainTests.test_unknown_format',
-            # timezones after 2038 use incorrect DST settings:
-            # https://github.com/cockroachdb/django-cockroachdb/issues/124
-            'expressions.tests.FTimeDeltaTests.test_datetime_subtraction_microseconds',
             # unsupported comparison operator: <jsonb> > <string>:
             # https://github.com/cockroachdb/cockroach/issues/49144
             'model_fields.test_jsonfield.TestQuerying.test_deep_lookup_transform',
@@ -183,17 +178,36 @@ class DatabaseFeatures(PostgresDatabaseFeatures):
             # https://github.com/cockroachdb/cockroach/issues/35706
             'expressions_window.tests.WindowFunctionTests.test_key_transform',
             'model_fields.test_jsonfield.TestQuerying.test_deep_distinct',
-            'model_fields.test_jsonfield.TestQuerying.test_join_key_transform_annotation_expression',
             'model_fields.test_jsonfield.TestQuerying.test_order_grouping_custom_decoder',
             'model_fields.test_jsonfield.TestQuerying.test_ordering_by_transform',
             'model_fields.test_jsonfield.TestQuerying.test_ordering_grouping_by_key_transform',
-            # db_collation appears even if none is specified:
-            # https://github.com/cockroachdb/cockroach/issues/54989
-            'inspectdb.tests.InspectDBTestCase.test_field_types',
             # unexpected partial unique index in pg_constraint query:
             # https://github.com/cockroachdb/cockroach/issues/61098
             'introspection.tests.IntrospectionTests.test_get_constraints_unique_indexes_orders',
+            # columns in CREATE INDEX's INCLUDE clause missing in introspection query:
+            # https://github.com/cockroachdb/cockroach/issues/59563
+            'indexes.tests.CoveringIndexTests.test_covering_func_index',
+            'indexes.tests.CoveringIndexTests.test_covering_index',
+            'indexes.tests.CoveringIndexTests.test_covering_partial_index',
         })
+        if not self.connection.features.is_cockroachdb_21_1:
+            expected_failures.update({
+                # unimplemented: unable to encode JSON as a table key:
+                # https://github.com/cockroachdb/cockroach/issues/35706
+                'model_fields.test_jsonfield.TestQuerying.test_join_key_transform_annotation_expression',
+                # unknown function: sha224() and sha384():
+                # https://github.com/cockroachdb/django-cockroachdb/issues/81
+                'db_functions.text.test_sha224.SHA224Tests.test_basic',
+                'db_functions.text.test_sha224.SHA224Tests.test_transform',
+                'db_functions.text.test_sha384.SHA384Tests.test_basic',
+                'db_functions.text.test_sha384.SHA384Tests.test_transform',
+                # timezones after 2038 use incorrect DST settings:
+                # https://github.com/cockroachdb/django-cockroachdb/issues/124
+                'expressions.tests.FTimeDeltaTests.test_datetime_subtraction_microseconds',
+                # db_collation appears even if none is specified:
+                # https://github.com/cockroachdb/cockroach/issues/54989
+                'inspectdb.tests.InspectDBTestCase.test_field_types',
+            })
         return expected_failures
 
     @cached_property
