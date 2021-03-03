@@ -177,11 +177,6 @@ class DatabaseFeatures(PostgresDatabaseFeatures):
             # unexpected partial unique index in pg_constraint query:
             # https://github.com/cockroachdb/cockroach/issues/61098
             'introspection.tests.IntrospectionTests.test_get_constraints_unique_indexes_orders',
-            # columns in CREATE INDEX's INCLUDE clause missing in introspection query:
-            # https://github.com/cockroachdb/cockroach/issues/59563
-            'indexes.tests.CoveringIndexTests.test_covering_func_index',
-            'indexes.tests.CoveringIndexTests.test_covering_index',
-            'indexes.tests.CoveringIndexTests.test_covering_partial_index',
         })
         if not self.connection.features.is_cockroachdb_21_1:
             expected_failures.update({
@@ -210,6 +205,10 @@ class DatabaseFeatures(PostgresDatabaseFeatures):
                 'schema.tests.SchemaTests.test_alter_textual_field_keep_null_status',
                 'schema.tests.SchemaTests.test_m2m_rename_field_in_target_model',
                 'schema.tests.SchemaTests.test_rename',
+                # columns in CREATE INDEX's INCLUDE clause missing in introspection query:
+                # https://github.com/cockroachdb/cockroach/issues/59563
+                'indexes.tests.CoveringIndexTests.test_covering_index',
+                'indexes.tests.CoveringIndexTests.test_covering_partial_index',
             })
         return expected_failures
 
