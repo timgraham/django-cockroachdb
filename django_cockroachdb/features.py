@@ -191,6 +191,8 @@ class DatabaseFeatures(PostgresDatabaseFeatures):
             # of type decimal, found type float
             # https://github.com/cockroachdb/cockroach/issues/73587#issuecomment-988408190
             'aggregation.tests.AggregateTestCase.test_aggregation_default_using_decimal_from_database',
+            # ProgrammingError: VALUES types int and float cannot be matched
+            'field_defaults.tests.DefaultTests.test_bulk_create_mixed_db_defaults_function',
         })
         if self.uses_server_side_binding:
             expected_failures.update({
