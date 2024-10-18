@@ -140,9 +140,8 @@ class DatabaseFeatures(PostgresDatabaseFeatures):
             'migrations.test_operations.OperationTests.test_alter_field_pk_fk',
             'migrations.test_operations.OperationTests.test_alter_field_pk_fk_char_to_int',
             'migrations.test_operations.OperationTests.test_alter_field_pk_fk_db_collation',
-
+            'migrations.test_operations.OperationTests.test_alter_field_reloads_state_fk_with_to_field_related_name_target_type_change',  # noqa
             'migrations.test_operations.OperationTests.test_alter_field_reloads_state_on_fk_with_to_field_target_type_change',  # noqa
-            'migrations.test_operations.OperationTests.test_rename_field_reloads_state_on_fk_target_changes',
             'schema.tests.SchemaTests.test_alter_auto_field_to_char_field',
             'schema.tests.SchemaTests.test_alter_autofield_pk_to_smallautofield_pk',
             'schema.tests.SchemaTests.test_alter_primary_key_db_collation',
@@ -190,9 +189,9 @@ class DatabaseFeatures(PostgresDatabaseFeatures):
                 # not supported for columns that are part of an index.
                 # https://go.crdb.dev/issue/47636
                 'schema.tests.SchemaTests.test_alter_primary_key_the_same_name',
-                'migrations.test_operations.OperationTests.test_alter_field_reloads_state_fk_with_to_field_related_name_target_type_change',  # noqa
                 'migrations.test_operations.OperationTests.test_alter_field_reloads_state_on_fk_target_changes',
                 'migrations.test_operations.OperationTests.test_alter_field_reloads_state_on_fk_with_to_field_target_changes',  # noqa
+                'migrations.test_operations.OperationTests.test_rename_field_reloads_state_on_fk_target_changes',
                 # unknown signature: concat(varchar, int) (returning <string>)
                 'migrations.test_operations.OperationTests.test_add_generate_field',
                 # concat(): unknown signature: concat(string, int2) (desired <string>)
