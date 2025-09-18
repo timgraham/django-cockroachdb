@@ -5,9 +5,9 @@ from django.db.models import (
 )
 from django.db.models.expressions import When
 from django.db.models.functions import (
-    ACos, ASin, ATan, ATan2, Cast, Ceil, Coalesce, Collate, Cos, Cot, Degrees,
-    Exp, Floor, JSONArray, JSONObject, Ln, Log, Now, Radians, Round, Sin, Sqrt,
-    StrIndex, Tan,
+    UUID4, ACos, ASin, ATan, ATan2, Cast, Ceil, Coalesce, Collate, Cos, Cot,
+    Degrees, Exp, Floor, JSONArray, JSONObject, Ln, Log, Now, Radians, Round,
+    Sin, Sqrt, StrIndex, Tan,
 )
 
 
@@ -107,6 +107,15 @@ def round_cast(self, compiler, connection, **extra_context):
     return clone.as_sql(compiler, connection, **extra_context)
 
 
+def uuid4(self, compiler, connection, **extra_context):
+    # CockroachDB 26.3+ claims to be PostgreSQL 18+ but doesn't support the
+    # uuidv4() function: https://github.com/cockroachdb/cockroach/issues/173147
+    # When it does, this function can be removed.
+    return self.as_sql(
+        compiler, connection, function="GEN_RANDOM_UUID", **extra_context
+    )
+
+
 def when(self, compiler, connection, **extra_context):
     # As for coalesce(), cast datetimes to timestamptz.
     if isinstance(getattr(self.result, 'value', None), datetime.datetime):
@@ -128,4 +137,5 @@ def register_functions():
     Now.as_cockroachdb = Now.as_postgresql
     Round.as_cockroachdb = round_cast
     StrIndex.as_cockroachdb = StrIndex.as_postgresql
+    UUID4.as_cockroachdb = uuid4
     When.as_cockroachdb = when

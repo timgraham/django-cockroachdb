@@ -21,9 +21,9 @@ production it is advised to use the package built from sources.
 ## Install and usage
 
 Use the version of django-cockroachdb that corresponds to your version of
-Django. For example, to get the latest compatible release for Django 6.0.x:
+Django. For example, to get the latest compatible release for Django 6.1.x:
 
-`pip install django-cockroachdb==6.0.*`
+`pip install django-cockroachdb==6.1.*`
 
 The minor release number of Django doesn't correspond to the minor release
 number of django-cockroachdb. Use the latest minor release of each.
@@ -106,7 +106,9 @@ using back to Cockroach Labs. To disable this, set
 - The `Field.db_comment` and `Meta.db_table_comment` options aren't supported
   due to [poor performance](https://github.com/cockroachdb/cockroach/issues/95068).
 
-- The `AnyValue` database function [isn't supported](https://github.com/cockroachdb/cockroach/issues/172590).
+- Unsupported database functions:
+   - [`AnyValue`](https://github.com/cockroachdb/cockroach/issues/172590)
+   - [`UUIDV7`](https://github.com/cockroachdb/cockroach/issues/97557)
 
 - `UniqueConstraint.nulls_distinct` [isn't supported](https://github.com/cockroachdb/cockroach/issues/115836).
 
@@ -148,6 +150,8 @@ using back to Cockroach Labs. To disable this, set
 - Queries which use [division that yields a different
   type](https://github.com/cockroachdb/django-cockroachdb/issues/21) aren't
   supported: `unsupported binary operator: <int> / <int> (desired <int>)`
+
+- The `BitXor` aggregate [isn't supported](https://github.com/cockroachdb/cockroach/issues/170352).
 
 ## Known issues and limitations in CockroachDB 24.3.x and earlier
 

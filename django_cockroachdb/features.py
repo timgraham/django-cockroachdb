@@ -71,6 +71,10 @@ class DatabaseFeatures(PostgresDatabaseFeatures):
     # Not supported: https://github.com/cockroachdb/cockroach/issues/59567
     supports_non_deterministic_collations = False
 
+    # Not supported: https://github.com/cockroachdb/cockroach/issues/97557
+    supports_uuid7_function = False
+    supports_uuid7_function_shift = False
+
     test_collations = {
         # PostgresDatabaseFeatures uses 'sv-x-icu' for 'non_default' but
         # CockroachDB doesn't introspect that properly:
@@ -205,6 +209,17 @@ class DatabaseFeatures(PostgresDatabaseFeatures):
             # ProgrammingError: VALUES types int and float cannot be matched
             'field_defaults.tests.DefaultTests.test_bulk_create_mixed_db_defaults_function',
         })
+        if not self.is_cockroachdb_26_3:
+            expected_failures.update({
+                # bit_xor aggregate not supported:
+                # https://github.com/cockroachdb/cockroach/issues/170352
+                'aggregation.tests.AggregateTestCase.test_aggregation_default_integer',
+                'aggregation.tests.AggregateTestCase.test_aggregation_default_unset',
+                'aggregation.tests.AggregateTestCase.test_aggregation_default_zero',
+                'aggregation.tests.AggregateTestCase.test_bit_xor',
+                'aggregation.tests.AggregateTestCase.test_bit_xor_on_only_false_values',
+                'aggregation.tests.AggregateTestCase.test_bit_xor_on_only_true_values',
+            })
         if self.is_cockroachdb_25_1:
             expected_failures.update({
                 # expected STORED COMPUTED COLUMN expression to have type
@@ -355,6 +370,13 @@ class DatabaseFeatures(PostgresDatabaseFeatures):
                 # https://github.com/cockroachdb/cockroach/issues/156682
                 'Test fails when run with all apps.': {
                     'migration_test_data_persistence.tests.MigrationDataPersistenceClassSetup',
+                },
+            })
+        if self.is_cockroachdb_26_3:
+            # https://github.com/cockroachdb/cockroach/issues/172800
+            skips.update({
+                'Test hangs, failng with "batch timestamp must be after replica GC threshold"': {
+                    'migrations.test_loader.LoaderTests.test_loading_order_does_not_create_circular_dependency',
                 },
             })
         return skips
