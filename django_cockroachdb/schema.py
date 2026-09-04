@@ -94,6 +94,21 @@ class DatabaseSchemaEditor(PostgresDatabaseSchemaEditor):
                 })
 
     def _alter_column_type_sql(self, model, old_field, new_field, new_type, old_collation, new_collation):
+        self.sql_alter_column_type = (
+            "ALTER COLUMN %(column)s TYPE %(type)s%(collation)s"
+        )
+        # Cast when data type changed. This must happen before the AutoField
+        # branch below since that branch also uses self.sql_alter_column_type
+        # and may involve a type change requiring a cast (e.g. CharField to
+        # AutoField).
+        if using_sql := self._using_sql(new_field, old_field):
+            # The USING expression must include the collation.
+            if collate_sql := self._collate_sql(
+                new_collation, old_collation, model._meta.db_table
+            ):
+                using_sql += f" {collate_sql}"
+            self.sql_alter_column_type += using_sql
+
         new_internal_type = new_field.get_internal_type()
         old_internal_type = old_field.get_internal_type()
         # Make ALTER TYPE with AutoField make sense.
@@ -117,17 +132,6 @@ class DatabaseSchemaEditor(PostgresDatabaseSchemaEditor):
                 [],
             )
         else:
-            self.sql_alter_column_type = (
-                "ALTER COLUMN %(column)s TYPE %(type)s%(collation)s"
-            )
-            # Cast when data type changed.
-            if using_sql := self._using_sql(new_field, old_field):
-                # The USING expression must include the collation.
-                if collate_sql := self._collate_sql(
-                    new_collation, old_collation, model._meta.db_table
-                ):
-                    using_sql += f" {collate_sql}"
-                self.sql_alter_column_type += using_sql
             return BaseDatabaseSchemaEditor._alter_column_type_sql(
                 self, model, old_field, new_field, new_type,
                 old_collation, new_collation,
