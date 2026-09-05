@@ -1,5 +1,10 @@
 # Changelog
 
+## 6.1.1 - Unreleased
+
+- Bumped ``DatabaseFeatures.minimum_database_version`` to 24.3 (an overlooked
+  omission in 6.1).
+
 ## 6.1 - 2026-08-07
 
 Initial release for Django 6.1.x and CockroachDB 24.3.x, 25.2.x, 25.4.x,
