@@ -26,13 +26,6 @@ class DatabaseSchemaEditor(PostgresDatabaseSchemaEditor):
     # statement. This isn't supported by CockroachDB.
     sql_update_with_default = "UPDATE %(table)s SET %(column)s = %(default)s WHERE %(column)s IS NULL"
 
-    # Create foreign keys as part of CREATE TABLE rather than in a separate
-    # ALTER TABLE statement. Every DDL statement has a fixed overhead on
-    # CockroachDB (a schema change job and descriptor version changes).
-    sql_create_inline_fk = (
-        'REFERENCES %(to_table)s (%(to_column)s)%(on_delete_db)s'
-    )
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # (table, column) pairs of foreign key indexes created by table_sql().
@@ -49,8 +42,11 @@ class DatabaseSchemaEditor(PostgresDatabaseSchemaEditor):
 
     def table_sql(self, model):
         sql, params = super().table_sql(model)
-        # Also create indexes on foreign keys as part of CREATE TABLE rather
-        # than in separate CREATE INDEX statements (see sql_create_inline_fk).
+        # Create indexes on foreign keys as part of CREATE TABLE rather than in
+        # separate CREATE INDEX statements. Every DDL statement has a fixed
+        # overhead on CockroachDB (a schema change job and descriptor version
+        # changes). The foreign key constraints themselves must remain
+        # deferred because the referenced table may not exist yet.
         index_sqls = []
         for field in model._meta.local_fields:
             if field.remote_field and self._field_should_be_indexed(model, field):
