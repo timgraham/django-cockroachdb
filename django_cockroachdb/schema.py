@@ -26,6 +26,18 @@ class DatabaseSchemaEditor(PostgresDatabaseSchemaEditor):
     # statement. This isn't supported by CockroachDB.
     sql_update_with_default = "UPDATE %(table)s SET %(column)s = %(default)s WHERE %(column)s IS NULL"
 
+    # Create foreign keys as part of CREATE TABLE rather than in a separate
+    # ALTER TABLE statement. Every DDL statement has a fixed overhead on
+    # CockroachDB (a schema change job and descriptor version changes).
+    sql_create_inline_fk = (
+        'REFERENCES %(to_table)s (%(to_column)s)%(on_delete_db)s'
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # (table, column) pairs of foreign key indexes created by table_sql().
+        self._inlined_fk_indexes = set()
+
     def __enter__(self):
         super().__enter__()
         # As long as DatabaseFeatures.can_rollback_ddl = False, compose() may
@@ -34,6 +46,32 @@ class DatabaseSchemaEditor(PostgresDatabaseSchemaEditor):
         # See also https://github.com/django/django/pull/15687#discussion_r1041503991.
         self.connection.ensure_connection()
         return self
+
+    def table_sql(self, model):
+        sql, params = super().table_sql(model)
+        # Also create indexes on foreign keys as part of CREATE TABLE rather
+        # than in separate CREATE INDEX statements (see sql_create_inline_fk).
+        index_sqls = []
+        for field in model._meta.local_fields:
+            if field.remote_field and self._field_should_be_indexed(model, field):
+                index_name = self._create_index_name(model._meta.db_table, [field.column])
+                index_sqls.append('INDEX %s (%s)' % (
+                    self.quote_name(index_name),
+                    self.quote_name(field.column),
+                ))
+                self._inlined_fk_indexes.add((model._meta.db_table, field.column))
+        if index_sqls:
+            end = sql.rindex(')')
+            sql = '%s, %s%s' % (sql[:end], ', '.join(index_sqls), sql[end:])
+        return sql, params
+
+    def _field_indexes_sql(self, model, field):
+        # Skip indexes that table_sql() already created.
+        key = (model._meta.db_table, field.column)
+        if key in self._inlined_fk_indexes:
+            self._inlined_fk_indexes.remove(key)
+            return []
+        return super()._field_indexes_sql(model, field)
 
     def add_index(self, model, index, concurrently=False):
         if index.contains_expressions and not self.connection.features.supports_expression_indexes:
